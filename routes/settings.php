@@ -10,7 +10,7 @@ Route::middleware(['auth'])->group(function () {
 });
 
 Route::middleware(['auth', 'verified'])->group(function () {
-    
+
     Route::livewire('settings/two-factor', 'pages::settings.two-factor')
         ->middleware(
             when(
