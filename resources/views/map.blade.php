@@ -171,188 +171,171 @@
 <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
 
 @section('scripts')
-    <script>
-        var map = L.map('map').setView([-7.7956, 110.3695], 13);
+<script>
+    var map = L.map('map').setView([-7.7956, 110.3695], 13);
 
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-        }).addTo(map);
+    L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
+        maxZoom: 19,
+        attribution: '&copy; OpenStreetMap'
+    }).addTo(map);
 
+    /* Digitize Function */
+    var drawnItems = new L.FeatureGroup();
+    map.addLayer(drawnItems);
 
-        /* Digitize Function */
-        var drawnItems = new L.FeatureGroup();
-        map.addLayer(drawnItems);
+    var drawControl = new L.Control.Draw({
+        draw: {
+            position: 'topleft',
+            polyline: true,
+            polygon: true,
+            rectangle: true,
+            circle: false,
+            marker: true,
+            circlemarker: false
+        },
+        edit: false
+    });
 
-        var drawControl = new L.Control.Draw({
-            draw: {
-                position: 'topleft',
-                polyline: true,
-                polygon: true,
-                rectangle: true,
-                circle: false,
-                marker: true,
-                circlemarker: false
-            },
-            edit: false
-        });
+    map.addControl(drawControl);
 
-        map.addControl(drawControl);
+    map.on('draw:created', function(e) {
+        var type = e.layerType,
+            layer = e.layer;
 
-        map.on('draw:created', function(e) {
-            var type = e.layerType,
-                layer = e.layer;
+        var drawnJSONObject = layer.toGeoJSON();
+        var objectGeometry = Terraformer.geojsonToWKT(drawnJSONObject.geometry);
 
-            console.log(type);
+        if (type === 'polyline') {
+            $('#geometry_polyline').val(objectGeometry);
+            $('#modalInputPolyline').modal('show');
+            $('#modalInputPolyline').on('hidden.bs.modal', function() {
+                location.reload();
+            });
+        } else if (type === 'polygon' || type === 'rectangle') {
+            $('#geometry_polygon').val(objectGeometry);
+            $('#modalInputPolygon').modal('show');
+            $('#modalInputPolygon').on('hidden.bs.modal', function() {
+                location.reload();
+            });
+        } else if (type === 'marker') {
+            $('#geometry_point').val(objectGeometry);
+            $('#modalInputPoint').modal('show');
+            $('#modalInputPoint').on('hidden.bs.modal', function() {
+                location.reload();
+            });
+        }
 
-            var drawnJSONObject = layer.toGeoJSON();
-            var objectGeometry = Terraformer.geojsonToWKT(drawnJSONObject.geometry);
+        drawnItems.addLayer(layer);
+    });
 
-            console.log(drawnJSONObject);
-            console.log(objectGeometry);
+    // GeoJSON Point
+    var points = L.geoJSON(null, {
+        onEachFeature: function(feature, layer) {
 
-            if (type === 'polyline') {
-                //Set Value Geometry Polyline To Modal Form Input
-                $('#geometry_polyline').val(objectGeometry);
+            var routedelete = "{{ route('points.delete', ':id') }}";
+            routedelete = routedelete.replace(':id', feature.properties.id);
 
-                //Show Modal Form Input
-                $('#modalInputPolyline').modal('show');
+            var popup_content = "Nama: " + feature.properties.name + "<br>" +
+                "Deskripsi: " + feature.properties.description + "<br>" +
+                "created_at: " + feature.properties.created_at + "<br>" +
+                "updated_at: " + feature.properties.updated_at + "<br>" +
+                "<img src='{{ asset('storage/images') }}/" + feature.properties.image +
+                "' alt='Image' class='img-thumbnail' width='400'>" +
+                "<br><br>" +
+                "<form action='" + routedelete + "' method='post'>" +
+                '@csrf' +
+                '@method("delete")' +
+                "<button type='submit' class='btn btn-sm btn-danger' title='Delete Feature' onclick='return confirm(\"Are you sure you want to delete this feature?\")'><i class='fa-solid fa-trash'></i></button>" +
+                "</form>";
 
-                // Modal dismiss reload page
-                $('#modalInputPolyline').on('hidden.bs.modal', function() {
-                    location.reload();
-                });
-            } else if (type === 'polygon' || type === 'rectangle') {
+            layer.on({
+                click: function(e) {
+                    points.bindPopup(popup_content);
+                },
+            });
+        },
+    });
 
-                //Set Value Geometry Polygon To Modal Form Input
-                $('#geometry_polygon').val(objectGeometry);
+    $.getJSON("{{ route('geojson_points') }}", function(data) {
+        points.addData(data);
+        map.addLayer(points);
+    });
 
-                //Show Modal Form Input
-                $('#modalInputPolygon').modal('show');
+    // GeoJSON Polyline
+    var polylines = L.geoJSON(null, {
+        onEachFeature: function(feature, layer) {
 
-                // Modal dismiss reload page
-                $('#modalInputPolygon').on('hidden.bs.modal', function() {
-                    location.reload();
-                });
-            } else if (type === 'marker') {
-                console.log("Create " + type);
+            var routedelete = "{{ route('polylines.delete', ':id') }}";
+            routedelete = routedelete.replace(':id', feature.properties.id);
 
-                //Set Value Geometry Point To Modal Form Input
-                $('#geometry_point').val(objectGeometry);
+            var popup_content = "Nama: " + feature.properties.name + "<br>" +
+                "Deskripsi: " + feature.properties.description + "<br>" +
+                "created_at: " + feature.properties.created_at + "<br>" +
+                "updated_at: " + feature.properties.updated_at + "<br>" +
+                "<img src='{{ asset('storage/images') }}/" + feature.properties.image +
+                "' alt='Image' class='img-thumbnail' width='400'>" +
+                "<br><br>" +
+                "<form action='" + routedelete + "' method='post'>" +
+                '@csrf' +
+                '@method("delete")' +
+                "<button type='submit' class='btn btn-sm btn-danger' title='Delete Feature' onclick='return confirm(\"Are you sure you want to delete this feature?\")'><i class='fa-solid fa-trash'></i></button>" +
+                "</form>";
 
-                //Show Modal Form Input
-                $('#modalInputPoint').modal('show');
+            layer.on({
+                click: function(e) {
+                    polylines.bindPopup(popup_content);
+                },
+            });
+        },
+    });
 
-                // Modal dismiss reload page
-                $('#modalInputPoint').on('hidden.bs.modal', function() {
-                    location.reload();
-                });
-            } else {
-                console.log('__undefined__');
-            }
+    $.getJSON("{{ route('geojson_polylines') }}", function(data) {
+        polylines.addData(data);
+        map.addLayer(polylines);
+    });
 
-            drawnItems.addLayer(layer);
-        });
+    // GeoJSON Polygon
+    var polygons = L.geoJSON(null, {
+        onEachFeature: function(feature, layer) {
 
-        // GeoJSON Point
-        var points = L.geoJSON(null, {
-            // Style
+            var routedelete = "{{ route('polygons.delete', ':id') }}";
+            routedelete = routedelete.replace(':id', feature.properties.id);
 
-            // onEachFeature
-            onEachFeature: function(feature, layer) {
-                // variable popup content
-                var popup_content = "Nama: " + feature.properties.name + "<br>" +
-                    "Deskripsi: " + feature.properties.description + "<br>" +
-                    "created_at: " + feature.properties.created_at + "<br>" +
-                    "updated_at: " + feature.properties.updated_at + "<br>" +
-                    "<img src='{{ asset('storage/images') }}/" + feature.properties.image +
-                    "' alt='Image' class='img-thumbnail' width='400'>";
+            var popup_content = "Nama: " + feature.properties.name + "<br>" +
+                "Deskripsi: " + feature.properties.description + "<br>" +
+                "created_at: " + feature.properties.created_at + "<br>" +
+                "updated_at: " + feature.properties.updated_at + "<br>" +
+                "<img src='{{ asset('storage/images') }}/" + feature.properties.image +
+                "' alt='Image' class='img-thumbnail' width='400'>" +
+                "<br><br>" +
+                "<form action='" + routedelete + "' method='post'>" +
+                '@csrf' +
+                '@method("delete")' +
+                "<button type='submit' class='btn btn-sm btn-danger' title='Delete Feature' onclick='return confirm(\"Are you sure you want to delete this feature?\")'><i class='fa-solid fa-trash'></i></button>" +
+                "</form>";
 
+            layer.on({
+                click: function(e) {
+                    polygons.bindPopup(popup_content);
+                },
+            });
+        },
+    });
 
-                layer.on({
-                    click: function(e) {
-                        points.bindPopup(popup_content);
-                    },
-                });
-            },
+    $.getJSON("{{ route('geojson_polygons') }}", function(data) {
+        polygons.addData(data);
+        map.addLayer(polygons);
+    });
 
-        });
-        $.getJSON("{{ route('geojson_points') }}", function(data) {
-            points.addData(data); // Menambahkan data ke dalam GeoJSON Point Sarana Prasarana
-            map.addLayer(points); // Menambahkan GeoJSON Point Sarana Prasarana ke dalam peta
-        });
+    var baseMaps = {};
 
-        // GeoJSON Polyline
-        var polylines = L.geoJSON(null, {
-            // Style
+    var overlayMaps = {
+        "Points": points,
+        "Polylines": polylines,
+        "Polygons": polygons,
+    };
 
-            // onEachFeature
-            onEachFeature: function(feature, layer) {
-                // variable popup content
-                var popup_content = `
-                    Nama: ${feature.properties.name}<br>
-                    Deskripsi: ${feature.properties.description}<br>
-                    created_at: ${feature.properties.created_at}<br>
-                    updated_at: ${feature.properties.updated_at}<br>
-                    <div style="text-align:center;">
-                        <img src="{{ asset('storage/images') }}/${feature.properties.image}"
-                            alt="Image" class="img-thumbnail" width="400">
-                    </div>
-`;
-                layer.on({
-                    click: function(e) {
-                        polylines.bindPopup(popup_content);
-                    },
-                });
-            },
-
-        });
-        $.getJSON("{{ route('geojson_polylines') }}", function(data) {
-            polylines.addData(data); // Menambahkan data ke dalam GeoJSON Polyline
-            map.addLayer(polylines); // Menambahkan GeoJSON Polyline ke dalam peta
-        });
-
-        // GeoJSON Polygon
-        var polygons = L.geoJSON(null, {
-            // Style
-
-            // onEachFeature
-            onEachFeature: function(feature, layer) {
-                // variable popup content
-                var popup_content = "Nama: " + feature.properties.name + "<br>" +
-                    "Deskripsi: " + feature.properties.description + "<br>" +
-                    "created_at: " + feature.properties.created_at + "<br>" +
-                    "updated_at: " + feature.properties.updated_at + "<br>" +
-                    "<div style='text-align:center;'>" +
-                    "<img src='{{ asset('storage/images') }}/" + feature.properties.image +
-                    "' alt='Image' class='img-thumbnail' width='400'>" +
-                    "</div>";
-
-                layer.on({
-                    click: function(e) {
-                        polygons.bindPopup(popup_content);
-                    },
-                });
-            },
-
-        });
-        $.getJSON("{{ route('geojson_polygons') }}", function(data) {
-            polygons.addData(data); // Menambahkan data ke dalam GeoJSON Polygon
-            map.addLayer(polygons); // Menambahkan GeoJSON Polygon ke dalam peta
-        });
-
-        // Control Layer
-        var baseMaps = {
-
-        };
-
-        var overlayMaps = {
-            "Points": points,
-            "Polylines": polylines,
-            "Polygons": polygons,
-        };
-
-        var controllayer = L.control.layers(baseMaps, overlayMaps);
-        controllayer.addTo(map);
-    </script>
+    var controllayer = L.control.layers(baseMaps, overlayMaps);
+    controllayer.addTo(map);
+</script>
 @endsection

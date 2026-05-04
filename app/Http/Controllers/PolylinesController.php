@@ -111,6 +111,27 @@ class PolylinesController extends Controller
      */
     public function destroy(string $id)
     {
-        //
+        //Mencari nama file gambar berdasarkan id polyline
+        $image = $this->polylines->find($id)->image;
+
+        // hapus data dari database
+        if (!$this->polylines->destroy($id)) {
+            // kembali ke halaman map
+            return redirect()->route('map')->with('error', 'Failed to delete polyline.');
+        }
+
+        // hapus file gambar jika ada
+        if ($image != null) {
+            // cek apakah file gambar ada di direktori penyimpanan
+            if (file_exists('storage/images/' . $image)) {
+
+                // hapus file gambar dari direktori penyimpanan
+                unlink('storage/images/' . $image);
+            }
+        }
+
+
+        // kembali ke halaman map dengan pesan sukses
+        return redirect()->route('map')->with('success', 'Polyline deleted successfully.');
     }
 }
