@@ -1,301 +1,137 @@
-@extends('layouts.template')
-
-@section('styles')
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-    {{-- Leaflet Draw CSS --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
-
-    <style>
-        body,
-        html {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-
-        #map {
-            height: calc(100vh - 56px);
-            width: 100%;
-        }
-    </style>
-@endsection
-
+@extends('layouts.app')
+@section('title', 'Edit Jalur Perubahan')
 
 @section('content')
-    <!-- Map -->
-    <div id="map"></div>
+<div class="page-header" style="background:linear-gradient(135deg,#E65100,#F57C00);">
+    <div class="header-icon"><i class="fas fa-edit"></i></div>
+    <div>
+        <h4>Edit Jalur: {{ $data->nama_jalur }}</h4>
+        <p>Perbarui data jalur perubahan lahan. Gambar ulang jika perlu mengubah geometri.</p>
+    </div>
+</div>
 
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div id="map"></div>
+    </div>
 
-    {{-- Modal Form Edit --}}
-    <div class="modal" tabindex="-1" id="modalEdit">
+    <div class="col-lg-4">
+        <div class="sidebar-card">
+            <h5 style="color:#E65100;"><i class="fas fa-edit me-2"></i>Edit Jalur</h5>
+            <hr>
 
-        <div class="modal-dialog">
+            <form action="/polylines/{{ $data->id }}" method="POST">
+                @csrf
+                @method('PUT')
 
-            <div class="modal-content">
-
-                <div class="modal-header">
-
-                    <h5 class="modal-title">Edit Data</h5>
-
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-
+                <div class="mb-3">
+                    <label class="form-label">Nama Jalur <span class="text-danger">*</span></label>
+                    <input type="text" name="nama_jalur" class="form-control" required value="{{ $data->nama_jalur }}">
                 </div>
 
-                <form action="{{ route('polylines.update', $id) }}" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label">Kecamatan</label>
+                    <select name="kecamatan" class="form-select" required>
+                        @foreach(['Masaran','Sambungmacan','Gondang','Sragen','Karangmalang',
+                                  'Sidoharjo','Tanon','Gemolong','Miri','Sumberlawang',
+                                  'Mondokan','Sukodono','Gesi','Tangen','Jenar',
+                                  'Plupuh','Ngrampal','Kalijambe','Sambirejo','Kedawung'] as $kec)
+                        <option value="{{ $kec }}" {{ $data->kecamatan == $kec ? 'selected' : '' }}>{{ $kec }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-                    @csrf
-                    @method('PATCH')
+                <div class="mb-3">
+                    <label class="form-label">Kategori Jalur <span class="text-danger">*</span></label>
+                    <select name="kategori_objek" class="form-select" required>
+                        @foreach(['Jalan Aspal','Jalan Tanah/Makadam','Jalan Setapak','Selokan/Drainase','Rel Kereta','Saluran Irigasi','Sungai/Kanal','Lainnya'] as $opt)
+                        <option value="{{ $opt }}" {{ $data->kategori_objek == $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-                    <div class="modal-body">
-
-                        {{-- Name --}}
-                        <div class="mb-3">
-
-                            <label for="name" class="form-label">Name</label>
-
-                            <input type="text" class="form-control" id="name" name="name"
-                                placeholder="Enter name">
-
-                        </div>
-
-
-                        {{-- Description --}}
-                        <div class="mb-3">
-
-                            <label for="description" class="form-label">Description</label>
-
-                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
-
-                        </div>
-
-
-                        {{-- Geometry --}}
-                        <div class="mb-3">
-
-                            <label for="geometry" class="form-label">Geometry</label>
-
-                            <textarea class="form-control" id="geometry" name="geometry" rows="3"></textarea>
-
-                        </div>
-
-
-                        {{-- Image --}}
-                        <div class="mb-3">
-
-                            <label for="image" class="form-label">Image</label>
-
-                            <input class="form-control" type="file" id="image" name="image"
-                                onchange="document.getElementById('preview-image').src = window.URL.createObjectURL(this.files[0])">
-
-                        </div>
-
-
-                        {{-- Preview Image --}}
-                        <div class="mb-3">
-
-                            <img src="" alt="" id="preview-image" class="img-thumbnail" width="400">
-
-                        </div>
-
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Jenis Sebelumnya</label>
+                        <select name="jenis_lama" class="form-select">
+                            <option value="">-- Tidak ada --</option>
+                            @foreach(['Jalan Tanah','Jalan Setapak','Saluran Irigasi Alami','Belum Ada Jalur','Selokan Tanah'] as $opt)
+                            <option value="{{ $opt }}" {{ $data->jenis_lama == $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                            @endforeach
+                        </select>
                     </div>
-
-
-                    <div class="modal-footer">
-
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            Close
-                        </button>
-
-                        <button type="submit" class="btn btn-primary">
-                            Save
-                        </button>
-
+                    <div class="col-6">
+                        <label class="form-label">Kondisi Sekarang</label>
+                        <select name="jenis_perubahan" class="form-select" required>
+                            @foreach(['Jalan Aspal','Jalan Cor Beton','Jalan Diperkeras','Selokan Permanen','Rel Kereta Baru','Saluran Irigasi Permanen'] as $opt)
+                            <option value="{{ $opt }}" {{ $data->jenis_perubahan == $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                            @endforeach
+                        </select>
                     </div>
+                </div>
 
-                </form>
+                <div class="mb-3">
+                    <label class="form-label">Tahun Perubahan</label>
+                    <input type="number" name="tahun_perubahan" class="form-control"
+                           min="1990" max="2030" required value="{{ $data->tahun_perubahan }}">
+                </div>
 
-            </div>
+                <div class="mb-3">
+                    <label class="form-label">Keterangan</label>
+                    <textarea name="keterangan" class="form-control" rows="2">{{ $data->keterangan }}</textarea>
+                </div>
 
+                <input type="hidden" name="geojson" id="geojson" value="{{ $data->geojson }}">
+
+                <div class="klik-info selected mb-3">
+                    <i class="fas fa-check-circle me-1"></i>
+                    Jalur tersedia — panjang: {{ $data->panjang_meter ? number_format($data->panjang_meter) . ' m' : '-' }}
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-warning-custom flex-grow-1">
+                        <i class="fas fa-save me-1"></i>Update Jalur
+                    </button>
+                    <a href="/polylines" class="btn" style="background:#eee;color:#555;border-radius:8px;font-weight:600;">
+                        Batal
+                    </a>
+                </div>
+            </form>
         </div>
-
     </div>
+</div>
 @endsection
 
-
-
 @section('scripts')
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    {{-- Leaflet Draw JS --}}
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-
-    {{-- Terraformer JS --}}
-    <script src="https://unpkg.com/@terraformer/wkt"></script>
-
-    {{-- JQuery JS --}}
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-
-    <script>
-        // ===============================
-        // Inisialisasi Map
-        // ===============================
-        var map = L.map('map').setView([-7.7956, 110.3695], 13);
-
-
-        // ===============================
-        // Basemap OpenStreetMap
-        // ===============================
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-
-        }).addTo(map);
-
-
-
-        /* ===============================
-        Digitize Function
-        =============================== */
-
-        var drawnItems = new L.FeatureGroup();
-
-        map.addLayer(drawnItems);
-
-
-        var drawControl = new L.Control.Draw({
-
-            draw: false,
-
-            edit: {
-
-                featureGroup: drawnItems,
-                edit: true,
-                remove: false
-
-            }
-
-        });
-
-        map.addControl(drawControl);
-
-
-
-        // ===============================
-        // Event Edit Geometry
-        // ===============================
-        map.on('draw:edited', function(e) {
-
-            var layers = e.layers;
-
-            layers.eachLayer(function(layer) {
-
-                // Convert layer ke GeoJSON
-                var drawnJSONObject = layer.toGeoJSON();
-
-                console.log(drawnJSONObject);
-
-
-                // Convert GeoJSON ke WKT
-                var objectGeometry = Terraformer.geojsonToWKT(
-                    drawnJSONObject.geometry
-                );
-
-                console.log(objectGeometry);
-
-
-                // Menampilkan properties
-                var properties = drawnJSONObject.properties;
-
-                console.log(properties);
-
-                drawnItems.addLayer(layer);
-
-                // Mengisi form modal edit dengan data yang sudah diubah
-                $('#name').val(properties.name);
-                $('#description').val(properties.description);
-                $('#geometry').val(objectGeometry);
-                $('#preview-image').attr('src', "{{ asset('storage/images/') }}/" + properties.image);
-
-
-                // menampilkan modal edit
-                $('#modalEdit').modal('show');
-
-            });
-
-        });
-
-
-
-        // ===============================
-        // GeoJSON Polyline
-        // ===============================
-        var polylines = L.geoJSON(null, {
-
-            onEachFeature: function(feature, layer) {
-
-                drawnItems.addLayer(layer);
-
-                var properties = feature.properties;
-
-                var objectGeometry = Terraformer.geojsonToWKT(
-                    feature.geometry
-                );
-
-                layer.on({
-
-                    click: function(e) {
-                        // Mengisi form modal edit dengan data yang sudah diubah
-                $('#name').val(properties.name);
-                $('#description').val(properties.description);
-                $('#geometry').val(objectGeometry);
-                $('#preview-image').attr('src', "{{ asset('storage/images/') }}/" + properties.image);
-
-
-                // menampilkan modal edit
-                $('#modalEdit').modal('show');
-
-                    },
-
-                });
-
-            },
-
-        });
-
-
-
-        // ===============================
-        // Load GeoJSON
-        // ===============================
-        $.getJSON("{{ route('geojson_polyline', $id) }}", function(data) {
-
-            polylines.addData(data);
-
-            map.addLayer(polylines);
-
-        });
-
-
-
-        // ===============================
-        // Layer Control
-        // ===============================
-        var baseMaps = {};
-
-
-        var overlayMaps = {
-
-            "Points": points,
-            "Polylines": polylines,
-            "Polygons": polygons,
-
-        };
-    </script>
+<script>
+var existingGeoJson = {!! $data->geojson !!};
+
+var map = L.map('map').setView([-7.4258, 111.0149], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+var drawnItems = new L.FeatureGroup().addTo(map);
+
+var existing = L.geoJSON({ type: 'Feature', geometry: existingGeoJson }, {
+    style: { color: '#E65100', weight: 4, opacity: 0.8 }
+}).addTo(drawnItems);
+
+map.fitBounds(existing.getBounds(), { padding: [40, 40] });
+
+var drawControl = new L.Control.Draw({
+    draw: {
+        polyline: { shapeOptions: { color: '#388E3C', weight: 4 } },
+        polygon: false, rectangle: false, circle: false, marker: false, circlemarker: false,
+    },
+    edit: { featureGroup: drawnItems }
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, function (e) {
+    drawnItems.clearLayers();
+    drawnItems.addLayer(e.layer);
+    document.getElementById('geojson').value = JSON.stringify(e.layer.toGeoJSON().geometry);
+});
+</script>
 @endsection

@@ -1,64 +1,61 @@
 <?php
 
-use App\Http\Controllers\PageController;
 use Illuminate\Support\Facades\Route;
+use App\Http\Controllers\PageController;
+use App\Http\Controllers\PointsController;
+use App\Http\Controllers\PolylinesController;
+use App\Http\Controllers\PolygonsController;
+use App\Http\Controllers\ApiController;
+use App\Http\Controllers\BpsController;
 
-// Halaman utama
-Route::get('/', PageController::class . '@landingpage')->name('home');
+// ─── HALAMAN PUBLIK ──────────────────────────────────────────────────────────
+Route::get('/',        [PageController::class, 'home'])->name('home');
+Route::get('/tentang', [PageController::class, 'tentang'])->name('tentang');
+Route::get('/peta',    [PageController::class, 'mapAll'])->name('map.all');
+Route::get('/statistik-bps', [BpsController::class, 'index'])->name('bps.index');
 
-// Halaman peta
-Route::get('/map', PageController::class . '@map')
-->middleware(['auth', 'verified'])
-->name('map');
+// ─── AUTH ─────────────────────────────────────────────────────────────────────
+Route::get('/login',     [PageController::class, 'loginForm'])->name('login');
+Route::post('/login',    [PageController::class, 'loginPost'])->name('login.post');
+Route::post('/logout',   [PageController::class, 'logout'])->name('logout');
+Route::get('/register',  [PageController::class, 'registerForm'])->name('register');
+Route::post('/register', [PageController::class, 'registerPost'])->name('register.post');
 
-// Dashboard (default dari Laravel Breeze/Jetstream)
-Route::view('/dashboard', 'dashboard')
-    ->middleware(['auth', 'verified'])
-    ->name('dashboard');
+// ─── PROTECTED (butuh login) ─────────────────────────────────────────────────
+Route::middleware('auth')->group(function () {
 
-Route::get('/table', PageController::class . '@table')->name('table');
+    Route::get('/dashboard', [PageController::class, 'dashboard'])->name('dashboard');
 
-//Points
-Route::post('/points', [App\Http\Controllers\PointsController::class, 'store'])
-->name('points.store');
+    // Points CRUD
+    Route::get('/points',              [PointsController::class, 'index'])->name('points.index');
+    Route::post('/points',             [PointsController::class, 'store'])->name('points.store');
+    Route::get('/points/{id}/edit',    [PointsController::class, 'edit'])->name('points.edit');
+    Route::put('/points/{id}',         [PointsController::class, 'update'])->name('points.update');
+    Route::delete('/points/{id}',      [PointsController::class, 'destroy'])->name('points.destroy');
 
-//  Delete Point
-Route::delete('/delete-points/{id}', [App\Http\Controllers\PointsController::class, 'destroy'])
-->name('points.delete');
+    // Polylines CRUD
+    Route::get('/polylines',              [PolylinesController::class, 'index'])->name('polylines.index');
+    Route::post('/polylines',             [PolylinesController::class, 'store'])->name('polylines.store');
+    Route::get('/polylines/{id}/edit',    [PolylinesController::class, 'edit'])->name('polylines.edit');
+    Route::put('/polylines/{id}',         [PolylinesController::class, 'update'])->name('polylines.update');
+    Route::delete('/polylines/{id}',      [PolylinesController::class, 'destroy'])->name('polylines.destroy');
 
-// Edit Point
-Route::get('/edit-points/{id}', [App\Http\Controllers\PointsController::class, 'edit'])
-->name('points.edit');
+    // Polygons CRUD
+    Route::get('/polygons',              [PolygonsController::class, 'index'])->name('polygons.index');
+    Route::post('/polygons',             [PolygonsController::class, 'store'])->name('polygons.store');
+    Route::get('/polygons/{id}/edit',    [PolygonsController::class, 'edit'])->name('polygons.edit');
+    Route::put('/polygons/{id}',         [PolygonsController::class, 'update'])->name('polygons.update');
+    Route::delete('/polygons/{id}',      [PolygonsController::class, 'destroy'])->name('polygons.destroy');
 
-//Route untuk update point
-Route::patch('/update-points/{id}', [App\Http\Controllers\PointsController::class, 'update'])->name('points.update');
+    // BPS - kelola data statistik (admin)
+    Route::get('/bps-manage',         [BpsController::class, 'manage'])->name('bps.manage');
+    Route::post('/bps-manage',        [BpsController::class, 'store'])->name('bps.store');
+    Route::delete('/bps-manage/{id}', [BpsController::class, 'destroy'])->name('bps.destroy');
 
+});
 
-//Polylines
-Route::post('/polylines', [App\Http\Controllers\PolylinesController::class, 'store'])
-->name('polylines.store');
-
-Route::delete('/delete-polylines/{id}', [App\Http\Controllers\PolylinesController::class, 'destroy'])
-->name('polylines.delete');
-
-// Edit Polyline
-Route::get('/edit-polylines/{id}', [App\Http\Controllers\PolylinesController::class, 'edit'])
-->name('polylines.edit');
-
-//Route untuk update polyline
-Route::patch('/update-polylines/{id}', [App\Http\Controllers\PolylinesController::class, 'update'])->name('polylines.update');
-
-
-// Polygons
-Route::post('/polygons', [App\Http\Controllers\PolygonsController::class, 'store'])
-->name('polygons.store');
-
-Route::delete('/delete-polygons/{id}', [App\Http\Controllers\PolygonsController::class, 'destroy'])
-->name('polygons.delete');
-
-// Edit Polygon
-Route::get('/edit-polygons/{id}', [App\Http\Controllers\PolygonsController::class, 'edit'])
-->name('polygons.edit');
-
-//Route untuk update polygon
-Route::patch('/update-polygons/{id}', [App\Http\Controllers\PolygonsController::class, 'update'])->name('polygons.update');
+// ─── API GeoJSON (untuk Leaflet, publik) ─────────────────────────────────────
+Route::get('/api/points',    [ApiController::class, 'getPoints']);
+Route::get('/api/polylines', [ApiController::class, 'getPolylines']);
+Route::get('/api/polygons',  [ApiController::class, 'getPolygons']);
+Route::get('/api/bps-lahan', [ApiController::class, 'getBpsLahan']);

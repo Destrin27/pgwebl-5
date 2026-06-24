@@ -4,210 +4,158 @@ namespace App\Http\Controllers;
 
 use App\Models\pointsModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PointsController extends Controller
 {
-    protected $points; // deklarasi property
-
-    /**
-     * Display a listing of the resource.
-     */
-    public function __construct()
-    {
-        $this->points = new pointsModel();
-    }
-
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        return view('map-point');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    // ───────────────────────── STORE ─────────────────────────
+    public function store(Request $req)
     {
-        //
+        $req->validate([
+            'nama_lokasi'     => 'required|string|max:255',
+            'kecamatan'       => 'required|string',
+            'kategori_objek'  => 'required|string',
+            'penggunaan_lama' => 'required|string',
+            'penggunaan_baru' => 'required|string',
+            'tahun_perubahan' => 'required|integer|min:1990|max:2030',
+            'keterangan'      => 'nullable|string',
+            'foto'            => 'nullable|image|max:2048',
+            'lat'             => 'required|numeric',
+            'lng'             => 'required|numeric',
+        ]);
+
+        $fotoPath = null;
+        if ($req->hasFile('foto')) {
+            $fotoPath = $req->file('foto')->store('images', 'public');
+        }
+
+        DB::statement("
+            INSERT INTO points (
+                nama_lokasi,
+                kecamatan,
+                kategori_objek,
+                penggunaan_lama,
+                penggunaan_baru,
+                tahun_perubahan,
+                keterangan,
+                foto,
+                geom,
+                created_at,
+                updated_at
+            )
+            VALUES (
+                ?, ?, ?, ?, ?, ?, ?, ?,
+                ST_SetSRID(ST_MakePoint(?, ?), 4326),
+                NOW(), NOW()
+            )
+        ", [
+            $req->nama_lokasi,
+            $req->kecamatan,
+            $req->kategori_objek,
+            $req->penggunaan_lama,
+            $req->penggunaan_baru,
+            $req->tahun_perubahan,
+            $req->keterangan,
+            $fotoPath,
+            $req->lng,
+            $req->lat
+        ]);
+
+        return redirect()->route('points.index')
+            ->with('success', 'Data titik berhasil disimpan!');
     }
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
+    // ───────────────────────── EDIT ─────────────────────────
+    public function edit($id)
     {
-        //Validasi input
-        $request->validate(
-            [
-                'geometry_point' => 'required',
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ],
-            [
-                'geometry_point.required' => 'Geometry point is required.',
-                'name.required' => 'Name is required.',
-                'name.string' => 'Name must be a string.',
-                'name.max' => 'Name must be at most 255 characters.',
-                'description.required' => 'Description is required.',
-                'description.string' => 'Description must be a string.',
-                'image.image' => 'The image must be a valid image file.',
-                'image.mimes' => 'The image must be a file of type: jpeg, png, jpg, gif.',
-                'image.max' => 'The image may not be greater than 2048 kilobytes.',
-            ]
+        $data = DB::select(
+            'SELECT *, ST_Y(geom) as lat, ST_X(geom) as lng FROM points WHERE id = ?',
+            [$id]
         );
 
-        if (!is_dir('storage/images')) {
-            mkdir('./storage/images', 0777);
+        if (empty($data)) {
+            return redirect()->route('points.index')
+                ->with('error', 'Data tidak ditemukan.');
         }
 
-        // Get Uploaded Image
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $name_image = time() . "_point." . strtolower($image->getClientOriginalExtension());
-            $image->move('storage/images', $name_image);
-        } else {
-            $name_image = null;
-        }
-
-        // simpan data ke database
-        $data = [
-            'geom' => $request->geometry_point,
-            'name' => $request->name,
-            'description' => $request->description,
-            'image' => $name_image,
-        ];
-
-        // simpan data ke database
-        if (!$this->points->create($data)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to add point.');
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Point added successfully.');
+        return view('map-edit-point', ['data' => $data[0]]);
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    // ───────────────────────── UPDATE (FIXED TOTAL) ─────────────────────────
+    public function update(Request $req, $id)
     {
-        //
-    }
+        $req->validate([
+            'nama_lokasi'     => 'required|string|max:255',
+            'kecamatan'       => 'required|string',
+            'kategori_objek'  => 'required|string',
+            'penggunaan_lama' => 'required|string',
+            'penggunaan_baru' => 'required|string',
+            'tahun_perubahan' => 'required|integer|min:1990|max:2030',
+            'keterangan'      => 'nullable|string',
+            'foto'            => 'nullable|image|max:2048',
+            'lat'             => 'required|numeric',
+            'lng'             => 'required|numeric',
+        ]);
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
-    {
-        $data = [
-            'title' => 'Edit Point',
-            'id' => $id,
-            'point' => $this->points->find($id),
-        ];
+        $point = pointsModel::findOrFail($id);
+        $fotoPath = $point->foto;
 
-        return view('map-edit-point', $data);
-    }
-
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //Validasi input
-        $request->validate(
-            [
-                'geometry' => 'required',
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ],
-            [
-                'geometry_point.required' => 'Geometry point is required.',
-                'name.required' => 'Name is required.',
-                'name.string' => 'Name must be a string.',
-                'name.max' => 'Name must be at most 255 characters.',
-                'description.required' => 'Description is required.',
-                'description.string' => 'Description must be a string.',
-                'image.image' => 'The image must be a valid image file.',
-                'image.mimes' => 'The image must be a file of type: jpeg, png, jpg, gif.',
-                'image.max' => 'The image may not be greater than 2048 kilobytes.',
-            ]
-        );
-
-        if (!is_dir('storage/images')) {
-            mkdir('./storage/images', 0777);
-        }
-
-        $image_old = $this->points->find($id)->image;
-
-        // Get Uploaded Image
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $name_image = time() . "_point." . strtolower($image->getClientOriginalExtension());
-            $image->move('storage/images', $name_image);
-
-            // hapus file gambar jika ada
-        if ($image_old != null) {
-
-            // cek apakah file gambar ada di direktori penyimpanan
-            if (file_exists('storage/images/' . $image_old)) {
-
-                // hapus file gambar dari direktori penyimpanan
-                unlink('storage/images/' . $image_old);
+        if ($req->hasFile('foto')) {
+            if ($fotoPath) {
+                Storage::disk('public')->delete($fotoPath);
             }
-        }
-        } else {
-            $name_image = $image_old;
+            $fotoPath = $req->file('foto')->store('images', 'public');
         }
 
-        // simpan data ke database
-        $data = [
-            'geom' => $request->geometry,
-            'name' => $request->name,
-            'description' => $request->description,
-            'image' => $name_image,
-        ];
+        DB::statement("
+            UPDATE points SET
+                nama_lokasi = ?,
+                kecamatan = ?,
+                kategori_objek = ?,
+                penggunaan_lama = ?,
+                penggunaan_baru = ?,
+                tahun_perubahan = ?,
+                keterangan = ?,
+                foto = ?,
+                geom = ST_SetSRID(ST_MakePoint(?, ?), 4326),
+                updated_at = NOW()
+            WHERE id = ?
+        ", [
+            $req->nama_lokasi,
+            $req->kecamatan,
+            $req->kategori_objek,
+            $req->penggunaan_lama,
+            $req->penggunaan_baru,
+            $req->tahun_perubahan,
+            $req->keterangan,
+            $fotoPath,
+            $req->lng,
+            $req->lat,
+            $id
+        ]);
 
-        // simpan data ke database
-        if (!$this->points->find($id)->update($data)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to update point.');
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Point updated successfully.');
+        return redirect()->route('points.index')
+            ->with('success', 'Data titik berhasil diupdate!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    // ───────────────────────── DELETE ─────────────────────────
+    public function destroy($id)
     {
-        //Mencari nama file gambar berdasarkan id point
-        $image = $this->points->find($id)->image;
+        $point = pointsModel::findOrFail($id);
 
-        // hapus data dari database
-        if (!$this->points->destroy($id)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to delete point.');
+        if ($point->foto) {
+            Storage::disk('public')->delete($point->foto);
         }
 
-        // hapus file gambar jika ada
-        if ($image != null) {
+        $point->delete();
 
-            // cek apakah file gambar ada di direktori penyimpanan
-            if (file_exists('storage/images/' . $image)) {
-
-                // hapus file gambar dari direktori penyimpanan
-                unlink('storage/images/' . $image);
-            }
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Point deleted successfully.');
+        return redirect()->route('points.index')
+            ->with('success', 'Data titik berhasil dihapus!');
     }
 }

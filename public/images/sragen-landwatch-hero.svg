@@ -1,0 +1,33 @@
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 1200 800" role="img" aria-labelledby="title desc">
+  <title id="title">SragenLandWatch ilustrasi peta Sragen</title>
+  <desc id="desc">Grafis peta Sragen dengan elemen hijau dan ikon lokalisasi.</desc>
+  <defs>
+    <linearGradient id="bg" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#1e3a16" />
+      <stop offset="100%" stop-color="#4caf50" />
+    </linearGradient>
+    <linearGradient id="highlight" x1="0" y1="0" x2="1" y2="1">
+      <stop offset="0%" stop-color="#fff" stop-opacity="0.9" />
+      <stop offset="100%" stop-color="#fff" stop-opacity="0.15" />
+    </linearGradient>
+  </defs>
+  <rect width="1200" height="800" rx="32" fill="url(#bg)" />
+  <path d="M220 720C320 680 380 620 450 600C520 580 620 610 700 560C770 525 790 420 860 380C940 340 1020 390 1080 360" fill="none" stroke="#c8e6c9" stroke-width="32" stroke-linecap="round" />
+  <path d="M190 600C240 560 290 530 350 520C415 510 500 520 570 480C620 450 670 420 730 420C810 420 860 475 930 480C990 485 1040 520 1100 515" fill="none" stroke="#a5d6a7" stroke-width="24" stroke-linecap="round" />
+  <ellipse cx="720" cy="290" rx="130" ry="100" fill="rgba(255,255,255,0.08)" />
+  <circle cx="720" cy="290" r="18" fill="#fff" />
+  <path d="M720 180L720 250" stroke="#fff" stroke-width="14" stroke-linecap="round" />
+  <path d="M720 310L720 540" stroke="#fff" stroke-width="14" stroke-linecap="round" />
+  <circle cx="720" cy="290" r="70" fill="none" stroke="#fff" stroke-width="12" />
+  <circle cx="720" cy="290" r="100" fill="none" stroke="#c8e6c9" stroke-width="8" stroke-dasharray="14 24" />
+  <rect x="96" y="128" width="512" height="256" rx="24" fill="url(#highlight)" />
+  <path d="M144 208L192 176L240 208M240 208L240 304M240 304H160" stroke="#18551c" stroke-width="16" fill="none" stroke-linecap="round" stroke-linejoin="round" />
+  <path d="M176 304V240H224" stroke="#18551c" stroke-width="16" fill="none" stroke-linecap="round" />
+  <circle cx="368" cy="216" r="14" fill="#18551c" />
+  <circle cx="432" cy="256" r="14" fill="#18551c" />
+  <circle cx="320" cy="320" r="14" fill="#18551c" />
+  <path d="M688 720C780 660 840 560 940 500" fill="none" stroke="#dcedc8" stroke-width="18" stroke-linecap="round" />
+  <path d="M940 500C980 470 1030 450 1070 430" fill="none" stroke="#f1f8e9" stroke-width="16" stroke-linecap="round" />
+  <text x="110" y="680" font-family="Inter, sans-serif" font-size="52" fill="#e8f5e9" font-weight="700">SragenLandWatch</text>
+  <text x="110" y="740" font-family="Inter, sans-serif" font-size="28" fill="#c8e6c9">Pemantauan lahan, derajat hijau, data spasial.</text>
+</svg>

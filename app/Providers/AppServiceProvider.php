@@ -7,6 +7,7 @@ use Illuminate\Support\Facades\Date;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\ServiceProvider;
 use Illuminate\Validation\Rules\Password;
+use Illuminate\Support\Facades\File;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -24,6 +25,22 @@ class AppServiceProvider extends ServiceProvider
     public function boot(): void
     {
         $this->configureDefaults();
+        $this->ensureStorageLink();
+    }
+
+    /**
+     * Buat symlink public/storage → storage/app/public secara otomatis
+     * jika belum ada, sehingga foto yang di-upload bisa diakses via URL.
+     */
+    protected function ensureStorageLink(): void
+    {
+        $link   = public_path('storage');
+        $target = storage_path('app/public');
+
+        if (! File::exists($link) && ! is_link($link)) {
+            File::ensureDirectoryExists($target);
+            symlink($target, $link);
+        }
     }
 
     /**

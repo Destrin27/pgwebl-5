@@ -4,207 +4,121 @@ namespace App\Http\Controllers;
 
 use App\Models\polygonsModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
 
 class PolygonsController extends Controller
 {
-    protected $polygons;
-
-    public function __construct()
-    {
-        $this->polygons = new polygonsModel();
-    }
-
-    /**
-     * Display a listing of the resource.
-     */
     public function index()
     {
-        //
+        return view('map-polygon');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(Request $req)
     {
-        //
-    }
+        $req->validate([
+            'nama_area'       => 'required|string|max:255',
+            'kecamatan'       => 'required|string',
+            'kategori_objek'  => 'required|string',
+            'penggunaan_lama' => 'required|string',
+            'penggunaan_baru' => 'required|string',
+            'tahun_perubahan' => 'required|integer|min:1990|max:2030',
+            'keterangan'      => 'nullable|string',
+            'foto'            => 'nullable|image|max:2048',
+            'geojson'         => 'required|string',
+        ]);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //Validasi input
-        $request->validate(
+        $fotoPath = null;
+        if ($req->hasFile('foto')) {
+            $fotoPath = $req->file('foto')->store('images', 'public');
+        }
+
+        // Hitung luas otomatis (hektar) menggunakan UTM zone 49S
+        $result = DB::select(
+            'SELECT ST_Area(ST_Transform(ST_GeomFromGeoJSON(?), 32749))/10000 as luas',
+            [$req->geojson]
+        );
+        $luas = isset($result[0]) ? $result[0]->luas : 0;
+
+        DB::statement(
+            "INSERT INTO polygons (nama_area, kecamatan, kategori_objek, penggunaan_lama, penggunaan_baru,
+             luas_ha, tahun_perubahan, keterangan, foto, geom, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromGeoJSON(?),4326), NOW(), NOW())",
             [
-                'geometry_polygon' => 'required',
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ],
-            [
-                'geometry_polygon.required' => 'Geometry polygon is required.',
-                'name.required' => 'Name is required.',
-                'name.string' => 'Name must be a string.',
-                'name.max' => 'Name must be at most 255 characters.',
-                'description.required' => 'Description is required.',
-                'description.string' => 'Description must be a string.',
-                'image.image' => 'The image must be a valid image file.',
-                'image.mimes' => 'The image must be a file of type: jpeg, png, jpg, gif.',
-                'image.max' => 'The image may not be greater than 2048 kilobytes.',
+                $req->nama_area, $req->kecamatan, $req->kategori_objek, $req->penggunaan_lama,
+                $req->penggunaan_baru, $luas, $req->tahun_perubahan,
+                $req->keterangan, $fotoPath, $req->geojson,
             ]
         );
 
-        if (!is_dir('storage/images')) {
-            mkdir('./storage/images', 0777);
-        }
-
-        // Get Uploaded Image
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $name_image = time() . "_polygon." . strtolower($image->getClientOriginalExtension());
-            $image->move('storage/images', $name_image);
-        } else {
-            $name_image = null;
-        }
-
-        // simpan data ke database
-        $data = [
-            'geom' => $request->geometry_polygon,
-            'name' => $request->name,
-            'description' => $request->description,
-            'image' => $name_image,
-        ];
-
-        // simpan data ke database
-        if (!$this->polygons->create($data)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to add polygon.');
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Polygon added successfully.');
+        return redirect()->route('polygons.index')->with('success', 'Area perubahan lahan berhasil disimpan!');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function edit($id)
     {
-        //
+        $data = DB::select(
+            'SELECT *, ST_AsGeoJSON(geom) as geojson FROM polygons WHERE id = ?',
+            [$id]
+        );
+
+        if (empty($data)) {
+            return redirect()->route('polygons.index')->with('error', 'Data tidak ditemukan.');
+        }
+
+        return view('map-edit-polygon', ['data' => $data[0]]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function update(Request $req, $id)
     {
-        $data = [
-            'title' => 'Edit Polygon',
-            'id' => $id,
-            'polygon' => $this->polygons->find($id),
-        ];
+        $req->validate([
+            'nama_area'       => 'required|string|max:255',
+            'kecamatan'       => 'required|string',
+            'kategori_objek'  => 'required|string',
+            'penggunaan_lama' => 'required|string',
+            'penggunaan_baru' => 'required|string',
+            'tahun_perubahan' => 'required|integer|min:1990|max:2030',
+            'keterangan'      => 'nullable|string',
+            'foto'            => 'nullable|image|max:2048',
+            'geojson'         => 'required|string',
+        ]);
 
-        return view('map-edit-polygon', $data);
-    }
+        $polygon  = polygonsModel::findOrFail($id);
+        $fotoPath = $polygon->foto;
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //Validasi input
-        $request->validate(
+        if ($req->hasFile('foto')) {
+            if ($fotoPath) {
+                Storage::disk('public')->delete($fotoPath);
+            }
+            $fotoPath = $req->file('foto')->store('images', 'public');
+        }
+
+        $result = DB::select(
+            'SELECT ST_Area(ST_Transform(ST_GeomFromGeoJSON(?), 32749))/10000 as luas',
+            [$req->geojson]
+        );
+        $luas = isset($result[0]) ? $result[0]->luas : 0;
+
+        DB::statement(
+            "UPDATE polygons SET nama_area=?, kecamatan=?, kategori_objek=?, penggunaan_lama=?,
+             penggunaan_baru=?, luas_ha=?, tahun_perubahan=?, keterangan=?, foto=?,
+             geom=ST_SetSRID(ST_GeomFromGeoJSON(?),4326), updated_at=NOW() WHERE id=?",
             [
-                'geometry' => 'required',
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ],
-            [
-                'geometry_polygon.required' => 'Geometry polygon is required.',
-                'name.required' => 'Name is required.',
-                'name.string' => 'Name must be a string.',
-                'name.max' => 'Name must be at most 255 characters.',
-                'description.required' => 'Description is required.',
-                'description.string' => 'Description must be a string.',
-                'image.image' => 'The image must be a valid image file.',
-                'image.mimes' => 'The image must be a file of type: jpeg, png, jpg, gif.',
-                'image.max' => 'The image may not be greater than 2048 kilobytes.',
+                $req->nama_area, $req->kecamatan, $req->kategori_objek, $req->penggunaan_lama,
+                $req->penggunaan_baru, $luas, $req->tahun_perubahan,
+                $req->keterangan, $fotoPath, $req->geojson, $id,
             ]
         );
 
-        if (!is_dir('storage/images')) {
-            mkdir('./storage/images', 0777);
-        }
-
-        $image_old = $this->polygons->find($id)->image;
-
-        // Get Uploaded Image
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $name_image = time() . "_polygon." . strtolower($image->getClientOriginalExtension());
-            $image->move('storage/images', $name_image);
-
-            // hapus file gambar jika ada
-            if ($image_old != null) {
-
-                // cek apakah file gambar ada di direktori penyimpanan
-                if (file_exists('storage/images/' . $image_old)) {
-
-                    // hapus file gambar dari direktori penyimpanan
-                    unlink('storage/images/' . $image_old);
-                }
-            }
-        } else {
-            $name_image = $image_old;
-        }
-
-        // simpan data ke database
-        $data = [
-            'geom' => $request->geometry,
-            'name' => $request->name,
-            'description' => $request->description,
-            'image' => $name_image,
-        ];
-
-        // simpan data ke database
-        if (!$this->polygons->find($id)->update($data)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to update polygon.');
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Polygon updated successfully.');
+        return redirect()->route('polygons.index')->with('success', 'Data area berhasil diupdate!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        //Mencari nama file gambar berdasarkan id polygon
-        $image = $this->polygons->find($id)->image;
-
-        // hapus data dari database
-        if (!$this->polygons->destroy($id)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to delete polygon.');
+        $polygon = polygonsModel::findOrFail($id);
+        if ($polygon->foto) {
+            Storage::disk('public')->delete($polygon->foto);
         }
-
-        // hapus file gambar jika ada
-        if ($image != null) {
-
-            // cek apakah file gambar ada di direktori penyimpanan
-            if (file_exists('storage/images/' . $image)) {
-
-                // hapus file gambar dari direktori penyimpanan
-                unlink('storage/images/' . $image);
-            }
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Polygon deleted successfully.');
+        $polygon->delete();
+        return redirect()->route('polygons.index')->with('success', 'Data area berhasil dihapus!');
     }
 }

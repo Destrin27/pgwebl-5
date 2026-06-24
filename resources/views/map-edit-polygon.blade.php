@@ -1,301 +1,159 @@
-@extends('layouts.template')
-
-@section('styles')
-    <!-- Leaflet CSS -->
-    <link rel="stylesheet" href="https://unpkg.com/leaflet@1.9.4/dist/leaflet.css" />
-
-    {{-- Leaflet Draw CSS --}}
-    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.css">
-
-    <style>
-        body,
-        html {
-            width: 100%;
-            height: 100%;
-            margin: 0;
-            padding: 0;
-            overflow: hidden;
-        }
-
-        #map {
-            height: calc(100vh - 56px);
-            width: 100%;
-        }
-    </style>
-@endsection
-
+@extends('layouts.app')
+@section('title', 'Edit Area Lahan')
 
 @section('content')
-    <!-- Map -->
-    <div id="map"></div>
+<div class="page-header" style="background:linear-gradient(135deg,#E65100,#F57C00);">
+    <div class="header-icon"><i class="fas fa-edit"></i></div>
+    <div>
+        <h4>Edit Area: {{ $data->nama_area }}</h4>
+        <p>Hapus polygon lama dan gambar ulang, atau update hanya atributnya.</p>
+    </div>
+</div>
 
+<div class="row g-4">
+    <div class="col-lg-8">
+        <div id="map"></div>
+        <div class="mt-3 alert alert-warning py-2" style="font-size:0.85rem;">
+            <i class="fas fa-exclamation-triangle me-1"></i>
+            Untuk ubah geometri: hapus polygon lama (tombol edit → delete) lalu gambar ulang.
+        </div>
+    </div>
 
-    {{-- Modal Form Edit --}}
-    <div class="modal" tabindex="-1" id="modalEdit">
+    <div class="col-lg-4">
+        <div class="sidebar-card">
+            <h5 style="color:#E65100;"><i class="fas fa-edit me-2"></i>Edit Area Polygon</h5>
+            <hr>
 
-        <div class="modal-dialog">
+            <form action="/polygons/{{ $data->id }}" method="POST" enctype="multipart/form-data">
+                @csrf
+                @method('PUT')
 
-            <div class="modal-content">
-
-                <div class="modal-header">
-
-                    <h5 class="modal-title">Edit Data</h5>
-
-                    <button type="button" class="btn-close" data-bs-dismiss="modal" aria-label="Close"></button>
-
+                <div class="mb-3">
+                    <label class="form-label">Nama Area <span class="text-danger">*</span></label>
+                    <input type="text" name="nama_area" class="form-control" required value="{{ $data->nama_area }}">
                 </div>
 
-                <form action="{{ route('polygons.update', $id) }}" method="post" enctype="multipart/form-data">
+                <div class="mb-3">
+                    <label class="form-label">Kecamatan</label>
+                    <select name="kecamatan" class="form-select" required>
+                        @foreach(['Masaran','Sambungmacan','Gondang','Sragen','Karangmalang',
+                                  'Sidoharjo','Tanon','Gemolong','Miri','Sumberlawang',
+                                  'Mondokan','Sukodono','Gesi','Tangen','Jenar',
+                                  'Plupuh','Ngrampal','Kalijambe','Sambirejo','Kedawung'] as $kec)
+                        <option value="{{ $kec }}" {{ $data->kecamatan == $kec ? 'selected' : '' }}>{{ $kec }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-                    @csrf
-                    @method('PATCH')
+                <div class="mb-3">
+                    <label class="form-label">Kategori Area <span class="text-danger">*</span></label>
+                    <select name="kategori_objek" class="form-select" required>
+                        @foreach(['Permukiman','Sawah','Lahan Terbuka','Kebun/Perkebunan','Hutan','Tegalan/Ladang','Kawasan Industri','Tambak/Kolam','Lainnya'] as $opt)
+                        <option value="{{ $opt }}" {{ $data->kategori_objek == $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                        @endforeach
+                    </select>
+                </div>
 
-                    <div class="modal-body">
-
-                        {{-- Name --}}
-                        <div class="mb-3">
-
-                            <label for="name" class="form-label">Name</label>
-
-                            <input type="text" class="form-control" id="name" name="name"
-                                placeholder="Enter name">
-
-                        </div>
-
-
-                        {{-- Description --}}
-                        <div class="mb-3">
-
-                            <label for="description" class="form-label">Description</label>
-
-                            <textarea class="form-control" id="description" name="description" rows="3"></textarea>
-
-                        </div>
-
-
-                        {{-- Geometry --}}
-                        <div class="mb-3">
-
-                            <label for="geometry" class="form-label">Geometry</label>
-
-                            <textarea class="form-control" id="geometry" name="geometry" rows="3"></textarea>
-
-                        </div>
-
-
-                        {{-- Image --}}
-                        <div class="mb-3">
-
-                            <label for="image" class="form-label">Image</label>
-
-                            <input class="form-control" type="file" id="image" name="image"
-                                onchange="document.getElementById('preview-image').src = window.URL.createObjectURL(this.files[0])">
-
-                        </div>
-
-
-                        {{-- Preview Image --}}
-                        <div class="mb-3">
-
-                            <img src="" alt="" id="preview-image" class="img-thumbnail" width="400">
-
-                        </div>
-
+                <div class="row g-2 mb-3">
+                    <div class="col-6">
+                        <label class="form-label">Lahan Sebelumnya</label>
+                        <select name="penggunaan_lama" class="form-select" required>
+                            @foreach(['Sawah Irigasi','Sawah Tadah Hujan','Hutan','Kebun/Perkebunan','Ladang/Tegalan','Semak Belukar','Lahan Terbuka'] as $opt)
+                            <option value="{{ $opt }}" {{ $data->penggunaan_lama == $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                            @endforeach
+                        </select>
                     </div>
-
-
-                    <div class="modal-footer">
-
-                        <button type="button" class="btn btn-secondary" data-bs-dismiss="modal">
-                            Close
-                        </button>
-
-                        <button type="submit" class="btn btn-primary">
-                            Save
-                        </button>
-
+                    <div class="col-6">
+                        <label class="form-label">Kondisi Sekarang</label>
+                        <select name="penggunaan_baru" class="form-select" required>
+                            @foreach(['Permukiman','Sawah','Lahan Terbuka','Kebun/Perkebunan','Hutan','Tegalan/Ladang','Kawasan Industri','Tambak/Kolam'] as $opt)
+                            <option value="{{ $opt }}" {{ $data->penggunaan_baru == $opt ? 'selected' : '' }}>{{ $opt }}</option>
+                            @endforeach
+                        </select>
                     </div>
+                </div>
 
-                </form>
+                <div class="mb-3">
+                    <label class="form-label">Tahun Perubahan</label>
+                    <input type="number" name="tahun_perubahan" class="form-control"
+                           min="1990" max="2030" required value="{{ $data->tahun_perubahan }}">
+                </div>
 
-            </div>
+                @if($data->foto)
+                <div class="mb-3">
+                    <label class="form-label">Foto Saat Ini</label>
+                    <img src="{{ asset('storage/' . $data->foto) }}"
+                         class="img-fluid rounded mb-2" style="max-height:80px;object-fit:cover;width:100%;">
+                </div>
+                @endif
 
+                <div class="mb-3">
+                    <label class="form-label">Ganti Foto</label>
+                    <input type="file" name="foto" class="form-control" accept="image/*">
+                </div>
+
+                <div class="mb-3">
+                    <label class="form-label">Keterangan</label>
+                    <textarea name="keterangan" class="form-control" rows="2">{{ $data->keterangan }}</textarea>
+                </div>
+
+                <input type="hidden" name="geojson" id="geojson" value="{{ $data->geojson }}">
+
+                <div class="klik-info selected mb-3" id="info-geom">
+                    <i class="fas fa-check-circle me-1"></i>
+                    Geometri tersedia — luas: {{ number_format($data->luas_ha, 2) }} Ha
+                </div>
+
+                <div class="d-flex gap-2">
+                    <button type="submit" class="btn btn-warning-custom flex-grow-1">
+                        <i class="fas fa-save me-1"></i>Update Data
+                    </button>
+                    <a href="/polygons" class="btn" style="background:#eee;color:#555;border-radius:8px;font-weight:600;">
+                        Batal
+                    </a>
+                </div>
+            </form>
         </div>
-
     </div>
+</div>
 @endsection
 
-
-
 @section('scripts')
-    <!-- Leaflet JS -->
-    <script src="https://unpkg.com/leaflet@1.9.4/dist/leaflet.js"></script>
-
-    {{-- Leaflet Draw JS --}}
-    <script src="https://cdnjs.cloudflare.com/ajax/libs/leaflet.draw/1.0.4/leaflet.draw.js"></script>
-
-    {{-- Terraformer JS --}}
-    <script src="https://unpkg.com/@terraformer/wkt"></script>
-
-    {{-- JQuery JS --}}
-    <script src="https://code.jquery.com/jquery-3.7.1.min.js"></script>
-
-
-    <script>
-        // ===============================
-        // Inisialisasi Map
-        // ===============================
-        var map = L.map('map').setView([-7.7956, 110.3695], 13);
-
-
-        // ===============================
-        // Basemap OpenStreetMap
-        // ===============================
-        L.tileLayer('https://tile.openstreetmap.org/{z}/{x}/{y}.png', {
-
-            maxZoom: 19,
-            attribution: '&copy; OpenStreetMap'
-
-        }).addTo(map);
-
-
-
-        /* ===============================
-        Digitize Function
-        =============================== */
-
-        var drawnItems = new L.FeatureGroup();
-
-        map.addLayer(drawnItems);
-
-
-        var drawControl = new L.Control.Draw({
-
-            draw: false,
-
-            edit: {
-
-                featureGroup: drawnItems,
-                edit: true,
-                remove: false
-
-            }
-
-        });
-
-        map.addControl(drawControl);
-
-
-
-        // ===============================
-        // Event Edit Geometry
-        // ===============================
-        map.on('draw:edited', function(e) {
-
-            var layers = e.layers;
-
-            layers.eachLayer(function(layer) {
-
-                // Convert layer ke GeoJSON
-                var drawnJSONObject = layer.toGeoJSON();
-
-                console.log(drawnJSONObject);
-
-
-                // Convert GeoJSON ke WKT
-                var objectGeometry = Terraformer.geojsonToWKT(
-                    drawnJSONObject.geometry
-                );
-
-                console.log(objectGeometry);
-
-
-                // Menampilkan properties
-                var properties = drawnJSONObject.properties;
-
-                console.log(properties);
-
-                drawnItems.addLayer(layer);
-
-                // Mengisi form modal edit dengan data yang sudah diubah
-                $('#name').val(properties.name);
-                $('#description').val(properties.description);
-                $('#geometry').val(objectGeometry);
-                $('#preview-image').attr('src', "{{ asset('storage/images/') }}/" + properties.image);
-
-
-                // menampilkan modal edit
-                $('#modalEdit').modal('show');
-
-            });
-
-        });
-
-
-
-        // ===============================
-        // GeoJSON Polygon
-        // ===============================
-        var polygons = L.geoJSON(null, {
-
-            onEachFeature: function(feature, layer) {
-
-                drawnItems.addLayer(layer);
-
-                var properties = feature.properties;
-
-                var objectGeometry = Terraformer.geojsonToWKT(
-                    feature.geometry
-                );
-
-                layer.on({
-
-                    click: function(e) {
-                        // Mengisi form modal edit dengan data yang sudah diubah
-                $('#name').val(properties.name);
-                $('#description').val(properties.description);
-                $('#geometry').val(objectGeometry);
-                $('#preview-image').attr('src', "{{ asset('storage/images/') }}/" + properties.image);
-
-
-                // menampilkan modal edit
-                $('#modalEdit').modal('show');
-
-                    },
-
-                });
-
-            },
-
-        });
-
-
-
-        // ===============================
-        // Load GeoJSON
-        // ===============================
-        $.getJSON("{{ route('geojson_polygon', $id) }}", function(data) {
-
-            polygons.addData(data);
-
-            map.addLayer(polygons);
-
-        });
-
-
-
-        // ===============================
-        // Layer Control
-        // ===============================
-        var baseMaps = {};
-
-
-        var overlayMaps = {
-
-            "Points": points,
-            "Polylines": polylines,
-            "Polygons": polygons,
-
-        };
-    </script>
+<script>
+var existingGeoJson = {!! $data->geojson !!};
+
+var map = L.map('map').setView([-7.4258, 111.0149], 13);
+L.tileLayer('https://{s}.tile.openstreetmap.org/{z}/{x}/{y}.png', {
+    attribution: '&copy; OpenStreetMap contributors'
+}).addTo(map);
+
+var drawnItems = new L.FeatureGroup().addTo(map);
+
+// Load existing polygon
+var existing = L.geoJSON({ type: 'Feature', geometry: existingGeoJson }, {
+    style: { color: '#E65100', fillColor: '#FFCC80', fillOpacity: 0.4, weight: 2 }
+}).addTo(drawnItems);
+
+// Fit map to existing polygon
+map.fitBounds(existing.getBounds(), { padding: [30, 30] });
+
+var drawControl = new L.Control.Draw({
+    draw: {
+        polygon:   { shapeOptions: { color: '#388E3C', fillColor: '#66BB6A', fillOpacity: 0.3 } },
+        rectangle: { shapeOptions: { color: '#388E3C', fillColor: '#66BB6A', fillOpacity: 0.3 } },
+        polyline: false, circle: false, marker: false, circlemarker: false,
+    },
+    edit: { featureGroup: drawnItems }
+});
+map.addControl(drawControl);
+
+map.on(L.Draw.Event.CREATED, function (e) {
+    drawnItems.clearLayers();
+    drawnItems.addLayer(e.layer);
+    var geoJson = e.layer.toGeoJSON().geometry;
+    document.getElementById('geojson').value = JSON.stringify(geoJson);
+    document.getElementById('info-geom').innerHTML =
+        '<i class="fas fa-check-circle me-1"></i>Geometri baru digambar — luas akan dihitung ulang';
+});
+</script>
 @endsection

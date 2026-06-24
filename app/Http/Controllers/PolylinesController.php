@@ -4,204 +4,100 @@ namespace App\Http\Controllers;
 
 use App\Models\polylinesModel;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
 
 class PolylinesController extends Controller
 {
-    protected $polylines;
-
-    public function __construct()
-    {
-        $this->polylines = new polylinesModel();
-    }
-
     public function index()
     {
-        //
+        return view('map-polyline');
     }
 
-    /**
-     * Show the form for creating a new resource.
-     */
-    public function create()
+    public function store(Request $req)
     {
-        //
-    }
+        $req->validate([
+            'nama_jalur'      => 'required|string|max:255',
+            'kecamatan'       => 'required|string',
+            'kategori_objek'  => 'required|string',
+            'jenis_lama'      => 'nullable|string',
+            'jenis_perubahan' => 'required|string',
+            'panjang_meter'   => 'nullable|integer',
+            'tahun_perubahan' => 'required|integer|min:1990|max:2030',
+            'keterangan'      => 'nullable|string',
+            'geojson'         => 'required|string',
+        ]);
 
-    /**
-     * Store a newly created resource in storage.
-     */
-    public function store(Request $request)
-    {
-        //Validasi input
-        $request->validate(
+        // Hitung panjang otomatis dari PostGIS (meter)
+        $result = DB::select(
+            'SELECT ST_Length(ST_Transform(ST_GeomFromGeoJSON(?), 32749)) as panjang',
+            [$req->geojson]
+        );
+        $panjang = isset($result[0]) ? round($result[0]->panjang) : ($req->panjang_meter ?? 0);
+
+        DB::statement(
+            "INSERT INTO polylines (nama_jalur, kecamatan, kategori_objek, jenis_lama, jenis_perubahan,
+             panjang_meter, tahun_perubahan, keterangan, geom, created_at, updated_at)
+             VALUES (?, ?, ?, ?, ?, ?, ?, ?, ST_SetSRID(ST_GeomFromGeoJSON(?),4326), NOW(), NOW())",
             [
-                'geometry_polyline' => 'required',
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ],
-            [
-                'geometry_polyline.required' => 'Geometry polyline is required.',
-                'name.required' => 'Name is required.',
-                'name.string' => 'Name must be a string.',
-                'name.max' => 'Name must be at most 255 characters.',
-                'description.required' => 'Description is required.',
-                'description.string' => 'Description must be a string.',
-                'image.image' => 'The image must be a valid image file.',
-                'image.mimes' => 'The image must be a file of type: jpeg, png, jpg, gif.',
-                'image.max' => 'The image may not be greater than 2048 kilobytes.',
+                $req->nama_jalur, $req->kecamatan, $req->kategori_objek, $req->jenis_lama,
+                $req->jenis_perubahan, $panjang, $req->tahun_perubahan, $req->keterangan,
+                $req->geojson,
             ]
         );
 
-        if (!is_dir('storage/images')) {
-            mkdir('./storage/images', 0777);
-        }
-
-        // Get Uploaded Image
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $name_image = time() . "_polyline." . strtolower($image->getClientOriginalExtension());
-            $image->move('storage/images', $name_image);
-        } else {
-            $name_image = null;
-        }
-
-        // simpan data ke database
-        $data = [
-            'geom' => $request->geometry_polyline,
-            'name' => $request->name,
-            'description' => $request->description,
-            'image' => $name_image,
-        ];
-
-        // simpan data ke database
-        if (!$this->polylines->create($data)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to add polyline.');
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Polyline added successfully.');
+        return redirect()->route('polylines.index')->with('success', 'Data jalur berhasil disimpan!');
     }
 
-    /**
-     * Display the specified resource.
-     */
-    public function show(string $id)
+    public function edit($id)
     {
-        //
+        $data = DB::select(
+            'SELECT *, ST_AsGeoJSON(geom) as geojson FROM polylines WHERE id = ?',
+            [$id]
+        );
+
+        if (empty($data)) {
+            return redirect()->route('polylines.index')->with('error', 'Data tidak ditemukan.');
+        }
+
+        return view('map-edit-polyline', ['data' => $data[0]]);
     }
 
-    /**
-     * Show the form for editing the specified resource.
-     */
-    public function edit(string $id)
+    public function update(Request $req, $id)
     {
-        $data = [
-            'title' => 'Edit Polyline',
-            'id' => $id,
-            'polyline' => $this->polylines->find($id),
-        ];
+        $req->validate([
+            'nama_jalur'      => 'required|string|max:255',
+            'kecamatan'       => 'required|string',
+            'kategori_objek'  => 'required|string',
+            'jenis_lama'      => 'nullable|string',
+            'jenis_perubahan' => 'required|string',
+            'tahun_perubahan' => 'required|integer|min:1990|max:2030',
+            'keterangan'      => 'nullable|string',
+            'geojson'         => 'required|string',
+        ]);
 
-        return view('map-edit-polyline', $data);
-    }
+        $result  = DB::select(
+            'SELECT ST_Length(ST_Transform(ST_GeomFromGeoJSON(?), 32749)) as panjang',
+            [$req->geojson]
+        );
+        $panjang = isset($result[0]) ? round($result[0]->panjang) : 0;
 
-    /**
-     * Update the specified resource in storage.
-     */
-    public function update(Request $request, string $id)
-    {
-        //Validasi input
-        $request->validate(
+        DB::statement(
+            "UPDATE polylines SET nama_jalur=?, kecamatan=?, kategori_objek=?, jenis_lama=?, jenis_perubahan=?,
+             panjang_meter=?, tahun_perubahan=?, keterangan=?,
+             geom=ST_SetSRID(ST_GeomFromGeoJSON(?),4326), updated_at=NOW() WHERE id=?",
             [
-                'geometry' => 'required',
-                'name' => 'required|string|max:255',
-                'description' => 'required|string',
-                'image' => 'nullable|image|mimes:jpeg,png,jpg,gif|max:2048',
-            ],
-            [
-                'geometry_polyline.required' => 'Geometry polyline is required.',
-                'name.required' => 'Name is required.',
-                'name.string' => 'Name must be a string.',
-                'name.max' => 'Name must be at most 255 characters.',
-                'description.required' => 'Description is required.',
-                'description.string' => 'Description must be a string.',
-                'image.image' => 'The image must be a valid image file.',
-                'image.mimes' => 'The image must be a file of type: jpeg, png, jpg, gif.',
-                'image.max' => 'The image may not be greater than 2048 kilobytes.',
+                $req->nama_jalur, $req->kecamatan, $req->kategori_objek, $req->jenis_lama,
+                $req->jenis_perubahan, $panjang, $req->tahun_perubahan, $req->keterangan,
+                $req->geojson, $id,
             ]
         );
 
-        if (!is_dir('storage/images')) {
-            mkdir('./storage/images', 0777);
-        }
-
-        $image_old = $this->polylines->find($id)->image;
-
-        // Get Uploaded Image
-        if ($request->hasFile('image')) {
-            $image = $request->file('image');
-            $name_image = time() . "_polyline." . strtolower($image->getClientOriginalExtension());
-            $image->move('storage/images', $name_image);
-
-            // hapus file gambar jika ada
-            if ($image_old != null) {
-
-                // cek apakah file gambar ada di direktori penyimpanan
-                if (file_exists('storage/images/' . $image_old)) {
-
-                    // hapus file gambar dari direktori penyimpanan
-                    unlink('storage/images/' . $image_old);
-                }
-            }
-        } else {
-            $name_image = $image_old;
-        }
-
-        // simpan data ke database
-        $data = [
-            'geom' => $request->geometry,
-            'name' => $request->name,
-            'description' => $request->description,
-            'image' => $name_image,
-        ];
-
-        // simpan data ke database
-        if (!$this->polylines->find($id)->update($data)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to update polyline.');
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Polyline updated successfully.');
+        return redirect()->route('polylines.index')->with('success', 'Data jalur berhasil diupdate!');
     }
 
-    /**
-     * Remove the specified resource from storage.
-     */
-    public function destroy(string $id)
+    public function destroy($id)
     {
-        //Mencari nama file gambar berdasarkan id polyline
-        $image = $this->polylines->find($id)->image;
-
-        // hapus data dari database
-        if (!$this->polylines->destroy($id)) {
-            // kembali ke halaman map
-            return redirect()->route('map')->with('error', 'Failed to delete polyline.');
-        }
-
-        // hapus file gambar jika ada
-        if ($image != null) {
-
-            // cek apakah file gambar ada di direktori penyimpanan
-            if (file_exists('storage/images/' . $image)) {
-
-                // hapus file gambar dari direktori penyimpanan
-                unlink('storage/images/' . $image);
-            }
-        }
-
-        // kembali ke halaman map dengan pesan sukses
-        return redirect()->route('map')->with('success', 'Polyline deleted successfully.');
+        polylinesModel::findOrFail($id)->delete();
+        return redirect()->route('polylines.index')->with('success', 'Data jalur berhasil dihapus!');
     }
 }

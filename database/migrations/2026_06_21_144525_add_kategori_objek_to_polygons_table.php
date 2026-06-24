@@ -10,22 +10,21 @@ return new class extends Migration
      * Run the migrations.
      */
     public function up(): void
-    {
-        Schema::create('points', function (Blueprint $table) {
-            $table->id();
-            $table->geometry('geom');
-            $table->string('name');
-            $table->string('description');
-            $table->string('image')->nullable();
-            $table->timestamps();
+{
+    if (!Schema::hasColumn('polygons', 'kategori_objek')) {
+        Schema::table('polygons', function (Blueprint $table) {
+            $table->string('kategori_objek')->nullable();
         });
     }
+}
 
     /**
      * Reverse the migrations.
      */
     public function down(): void
     {
-        Schema::dropIfExists('points');
+        Schema::table('polygons', function (Blueprint $table) {
+            //
+        });
     }
 };
